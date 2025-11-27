@@ -10,6 +10,8 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    self.styleMask.remove(.resizable)
+
     super.awakeFromNib()
   }
 }

@@ -53,259 +53,251 @@ class PlayerScreen extends StatelessWidget {
                 ),
               ),
               // Content
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Artwork
-                    Container(
-                      width: 300,
-                      height: 300,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.5),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Hero(
-                        tag: '$heroTagPrefix${song.id}',
-                        child: QueryArtworkWidget(
-                          id: song.id,
-                          type: ArtworkType.AUDIO,
-                          keepOldArtwork: true,
-                          artworkHeight: 1000,
-                          artworkWidth: 1000,
-                          quality: 100,
-                          artworkFit: BoxFit.cover,
-                          nullArtworkWidget: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[800],
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Icon(
-                              Icons.music_note,
-                              size: 100,
-                              color: Colors.white,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableHeight = constraints.maxHeight;
+                  final availableWidth = constraints.maxWidth;
+                  final isLandscape = availableWidth > availableHeight;
+
+                  if (isLandscape) {
+                    // Landscape Layout
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Artwork Side
+                        Expanded(
+                          flex: 5,
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: AspectRatio(
+                                aspectRatio: 1,
+                                child: Hero(
+                                  tag: '$heroTagPrefix${song.id}',
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.5),
+                                          blurRadius: 20,
+                                          offset: const Offset(0, 10),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: QueryArtworkWidget(
+                                        id: song.id,
+                                        type: ArtworkType.AUDIO,
+                                        keepOldArtwork: true,
+                                        artworkHeight: 1000,
+                                        artworkWidth: 1000,
+                                        quality: 100,
+                                        artworkFit: BoxFit.cover,
+                                        nullArtworkWidget: Container(
+                                          color: Colors.grey[800],
+                                          child: const Icon(
+                                            Icons.music_note,
+                                            size: 100,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Title & Artist
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          Text(
-                            song.title,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            song.artist ?? "Unknown Artist",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.white.withOpacity(0.7),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Song Count
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              "${audioProvider.currentIndex + 1}/${audioProvider.songs.length}",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Controls with Glassmorphism
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: Container(
-                          width: MediaQuery.of(context).size.width * 0.9,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              // Top Controls (Shuffle & Favorite)
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                        // Controls Side
+                        Expanded(
+                          flex: 4,
+                          child: Center(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.shuffle,
-                                      size: 30,
-                                      color: audioProvider.isShuffleEnabled
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.primary
-                                          : Colors.white.withOpacity(0.5),
+                                  // Title & Artist
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
                                     ),
-                                    onPressed: () =>
-                                        audioProvider.toggleShuffle(),
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          song.title,
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          song.artist ?? "Unknown Artist",
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            color: Colors.white.withOpacity(
+                                              0.7,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  IconButton(
-                                    icon: Icon(
-                                      audioProvider.isFavorite(song.id)
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      size: 30,
-                                      color: audioProvider.isFavorite(song.id)
-                                          ? Colors.red
-                                          : Colors.white.withOpacity(0.5),
-                                    ),
-                                    onPressed: () =>
-                                        audioProvider.toggleFavorite(song.id),
+                                  const SizedBox(height: 20),
+                                  // Controls
+                                  _buildControls(
+                                    context,
+                                    audioProvider,
+                                    song,
+                                    width: availableWidth * 0.4,
                                   ),
                                 ],
                               ),
-                              // Slider
-                              Slider(
-                                value: audioProvider.position.inSeconds
-                                    .toDouble(),
-                                min: 0,
-                                max: audioProvider.duration.inSeconds
-                                    .toDouble(),
-                                onChanged: (value) {
-                                  audioProvider.seek(
-                                    Duration(seconds: value.toInt()),
-                                  );
-                                },
-                                activeColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                inactiveColor: Colors.white.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    // Portrait Layout
+                    // Calculate dynamic artwork size
+                    final maxArtworkSize = (availableHeight * 0.45).clamp(
+                      100.0,
+                      availableWidth - 40,
+                    );
+
+                    return Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: availableHeight),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).padding.top + 10,
+                            ),
+                            // Artwork
+                            Container(
+                              width: maxArtworkSize,
+                              height: maxArtworkSize,
+                              padding: const EdgeInsets.all(20.0),
+                              child: Hero(
+                                tag: '$heroTagPrefix${song.id}',
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.5),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 10),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: QueryArtworkWidget(
+                                      id: song.id,
+                                      type: ArtworkType.AUDIO,
+                                      keepOldArtwork: true,
+                                      artworkHeight: 1000,
+                                      artworkWidth: 1000,
+                                      quality: 100,
+                                      artworkFit: BoxFit.cover,
+                                      nullArtworkWidget: Container(
+                                        color: Colors.grey[800],
+                                        child: const Icon(
+                                          Icons.music_note,
+                                          size: 100,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                              Padding(
+                            ),
+                            // Title & Artist
+                            Flexible(
+                              flex: 2,
+                              child: Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 20,
                                 ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      _formatDuration(audioProvider.position),
+                                      song.title,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
+                                    const SizedBox(height: 10),
                                     Text(
-                                      _formatDuration(audioProvider.duration),
+                                      song.artist ?? "Unknown Artist",
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.white.withOpacity(0.7),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        "${audioProvider.currentIndex + 1}/${audioProvider.songs.length}",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 20),
-                              // Buttons
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.skip_previous,
-                                      size: 50,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () =>
-                                        audioProvider.playPrevious(),
-                                  ),
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withOpacity(0.5),
-                                          blurRadius: 10,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                    ),
-                                    child: IconButton(
-                                      icon: AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 300,
-                                        ),
-                                        transitionBuilder: (child, animation) {
-                                          return ScaleTransition(
-                                            scale: animation,
-                                            child: child,
-                                          );
-                                        },
-                                        child: Icon(
-                                          audioProvider.isPlaying
-                                              ? Icons.pause
-                                              : Icons.play_arrow,
-                                          key: ValueKey<bool>(
-                                            audioProvider.isPlaying,
-                                          ),
-                                          size: 60,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      onPressed: () {
-                                        if (audioProvider.isPlaying) {
-                                          audioProvider.pause();
-                                        } else {
-                                          audioProvider.resume();
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.skip_next,
-                                      size: 50,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () => audioProvider.playNext(),
-                                  ),
-                                ],
+                            ),
+                            // Controls
+                            Flexible(
+                              flex: 3,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 20),
+                                child: _buildControls(
+                                  context,
+                                  audioProvider,
+                                  song,
+                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -462,6 +454,147 @@ class PlayerScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  Widget _buildControls(
+    BuildContext context,
+    AudioProvider audioProvider,
+    dynamic song, {
+    double? width,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          width: width ?? MediaQuery.of(context).size.width * 0.9,
+          constraints: const BoxConstraints(maxWidth: 500),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
+          ),
+          child: Column(
+            children: [
+              // Top Controls (Shuffle & Favorite)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.shuffle,
+                      size: 30,
+                      color: audioProvider.isShuffleEnabled
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.white.withOpacity(0.5),
+                    ),
+                    onPressed: () => audioProvider.toggleShuffle(),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      audioProvider.isFavorite(song.id)
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      size: 30,
+                      color: audioProvider.isFavorite(song.id)
+                          ? Colors.red
+                          : Colors.white.withOpacity(0.5),
+                    ),
+                    onPressed: () => audioProvider.toggleFavorite(song.id),
+                  ),
+                ],
+              ),
+              // Slider
+              Slider(
+                value: audioProvider.position.inSeconds.toDouble(),
+                min: 0,
+                max: audioProvider.duration.inSeconds.toDouble(),
+                onChanged: (value) {
+                  audioProvider.seek(Duration(seconds: value.toInt()));
+                },
+                activeColor: Theme.of(context).colorScheme.primary,
+                inactiveColor: Colors.white.withOpacity(0.3),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(_formatDuration(audioProvider.position)),
+                    Text(_formatDuration(audioProvider.duration)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.skip_previous,
+                      size: 50,
+                      color: Colors.white,
+                    ),
+                    onPressed: () => audioProvider.playPrevious(),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Theme.of(context).colorScheme.primary,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withOpacity(0.5),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        transitionBuilder: (child, animation) {
+                          return ScaleTransition(
+                            scale: animation,
+                            child: child,
+                          );
+                        },
+                        child: Icon(
+                          audioProvider.isPlaying
+                              ? Icons.pause
+                              : Icons.play_arrow,
+                          key: ValueKey<bool>(audioProvider.isPlaying),
+                          size: 60,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onPressed: () {
+                        if (audioProvider.isPlaying) {
+                          audioProvider.pause();
+                        } else {
+                          audioProvider.resume();
+                        }
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.skip_next,
+                      size: 50,
+                      color: Colors.white,
+                    ),
+                    onPressed: () => audioProvider.playNext(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

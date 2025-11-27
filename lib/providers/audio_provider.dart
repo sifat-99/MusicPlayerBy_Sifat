@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:mime/mime.dart';
+import 'package:file_picker/file_picker.dart';
 
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sifat_audio/providers/settings_provider.dart';
@@ -43,6 +46,7 @@ class AudioProvider extends ChangeNotifier {
   bool _isShuffleEnabled = false;
   List<String> _favorites = [];
   List<String> _cachedIgnoredPaths = [];
+  List<String> _cachedMusicPaths = [];
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
 
@@ -80,9 +84,23 @@ class AudioProvider extends ChangeNotifier {
       }
     }
 
-    if (ignoredPathsChanged) {
+    // Check if music paths changed
+    bool musicPathsChanged = false;
+    if (_cachedMusicPaths.length != settings.musicPaths.length) {
+      musicPathsChanged = true;
+    } else {
+      for (int i = 0; i < _cachedMusicPaths.length; i++) {
+        if (_cachedMusicPaths[i] != settings.musicPaths[i]) {
+          musicPathsChanged = true;
+          break;
+        }
+      }
+    }
+
+    if (ignoredPathsChanged || musicPathsChanged) {
       _cachedIgnoredPaths = List.from(settings.ignoredPaths);
-      // Re-fetch songs to apply new ignore rules
+      _cachedMusicPaths = List.from(settings.musicPaths);
+      // Re-fetch songs to apply new ignore rules or scan new paths
       // Use microtask to avoid setState during build if this is called during build
       Future.microtask(() => fetchSongs());
     } else if (_songs.isNotEmpty) {
@@ -116,16 +134,19 @@ class AudioProvider extends ChangeNotifier {
   }
 
   Future<void> requestPermission() async {
-    var status = await Permission.storage.status;
-    if (!status.isGranted) {
-      await Permission.storage.request();
-    }
+    if (Platform.isAndroid || Platform.isIOS) {
+      var status = await Permission.storage.status;
+      if (!status.isGranted) {
+        await Permission.storage.request();
+      }
 
-    // For Android 13+
-    var audioStatus = await Permission.audio.status;
-    if (!audioStatus.isGranted) {
-      await Permission.audio.request();
+      // For Android 13+
+      var audioStatus = await Permission.audio.status;
+      if (!audioStatus.isGranted) {
+        await Permission.audio.request();
+      }
     }
+    // On macOS, permissions are handled by entitlements and system prompts when accessing files.
 
     fetchAll();
   }
@@ -135,12 +156,16 @@ class AudioProvider extends ChangeNotifier {
   }
 
   Future<void> fetchSongs() async {
-    _songs = await _audioQuery.querySongs(
-      sortType: null,
-      orderType: OrderType.ASC_OR_SMALLER,
-      uriType: UriType.EXTERNAL,
-      ignoreCase: true,
-    );
+    if (Platform.isMacOS) {
+      await _fetchSongsMacOS();
+    } else {
+      _songs = await _audioQuery.querySongs(
+        sortType: null,
+        orderType: OrderType.ASC_OR_SMALLER,
+        uriType: UriType.EXTERNAL,
+        ignoreCase: true,
+      );
+    }
 
     // Filter out ignored paths
     if (_settingsProvider.ignoredPaths.isNotEmpty) {
@@ -162,6 +187,11 @@ class AudioProvider extends ChangeNotifier {
   }
 
   Future<void> fetchArtists() async {
+    if (Platform.isMacOS) {
+      _artists = [];
+      notifyListeners();
+      return;
+    }
     _artists = await _audioQuery.queryArtists(
       sortType: null,
       orderType: OrderType.ASC_OR_SMALLER,
@@ -172,6 +202,11 @@ class AudioProvider extends ChangeNotifier {
   }
 
   Future<void> fetchAlbums() async {
+    if (Platform.isMacOS) {
+      _albums = [];
+      notifyListeners();
+      return;
+    }
     _albums = await _audioQuery.queryAlbums(
       sortType: null,
       orderType: OrderType.ASC_OR_SMALLER,
@@ -204,7 +239,7 @@ class AudioProvider extends ChangeNotifier {
   Future<void> _updatePlaylist() async {
     final audioSources = _filteredSongs.map((song) {
       return AudioSource.uri(
-        Uri.parse(song.uri!),
+        song.uri != null ? Uri.parse(song.uri!) : Uri.file(song.data),
         tag: MediaItem(
           id: song.id.toString(),
           album: song.album ?? "Unknown Album",
@@ -316,5 +351,68 @@ class AudioProvider extends ChangeNotifier {
       }
     }
     notifyListeners();
+  }
+
+  Future<void> _fetchSongsMacOS() async {
+    List<SongModel> songs = [];
+    // Default to Music directory
+    String? home = Platform.environment['HOME'];
+    if (home != null) {
+      String musicPath = p.join(home, 'Music');
+      Directory musicDir = Directory(musicPath);
+      if (await musicDir.exists()) {
+        await _scanDirectory(musicDir, songs);
+      }
+    }
+
+    // Scan custom paths
+    for (String path in _settingsProvider.musicPaths) {
+      Directory customDir = Directory(path);
+      if (await customDir.exists()) {
+        await _scanDirectory(customDir, songs);
+      }
+    }
+
+    _songs = songs;
+  }
+
+  Future<void> _scanDirectory(Directory dir, List<SongModel> songs) async {
+    try {
+      List<FileSystemEntity> entities = dir.listSync(recursive: false);
+      for (var entity in entities) {
+        if (entity is Directory) {
+          // Recursive scan
+          await _scanDirectory(entity, songs);
+        } else if (entity is File) {
+          String? mimeType = lookupMimeType(entity.path);
+          if (mimeType != null && mimeType.startsWith('audio/')) {
+            // Create a SongModel manually
+            // Note: Metadata extraction is limited without a proper tag reader.
+            // We'll use filename as title for now.
+            String filename = p.basename(entity.path);
+            String title = p.basenameWithoutExtension(entity.path);
+
+            // Generate a pseudo-ID based on path hash
+            int id = entity.path.hashCode;
+
+            songs.add(
+              SongModel({
+                '_id': id,
+                '_data': entity.path,
+                '_display_name': filename,
+                'title': title,
+                'artist': 'Unknown Artist',
+                'album': 'Unknown Album',
+                'duration': 0, // Duration requires reading the file
+                'is_music': true,
+                '_uri': Uri.file(entity.path).toString(),
+              }),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error scanning directory: $e");
+    }
   }
 }

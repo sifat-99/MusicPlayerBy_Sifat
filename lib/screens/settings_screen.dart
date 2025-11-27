@@ -7,6 +7,8 @@ import 'package:sifat_audio/providers/audio_provider.dart';
 import 'package:sifat_audio/screens/equalizer_screen.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -107,6 +109,17 @@ class SettingsScreen extends StatelessWidget {
                   subtitle: "Select folders to ignore",
                   onTap: () => _showIgnoredPathsDialog(context, settings),
                 ),
+
+                if (Platform.isMacOS) ...[
+                  _buildSectionHeader(context, "Library"),
+                  _buildListTile(
+                    context,
+                    icon: Icons.library_music,
+                    title: "Music Library Locations",
+                    subtitle: "Manage folders to scan",
+                    onTap: () => _showLibraryDialog(context, settings),
+                  ),
+                ],
 
                 _buildSectionHeader(context, "Audio"),
                 _buildListTile(
@@ -467,6 +480,80 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showLibraryDialog(BuildContext context, SettingsProvider settings) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Music Library Locations"),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (settings.musicPaths.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text("Only scanning default Music folder"),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: settings.musicPaths.length,
+                          itemBuilder: (context, index) {
+                            final path = settings.musicPaths[index];
+                            return ListTile(
+                              title: Text(
+                                path,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () {
+                                  settings.removeMusicPath(path);
+                                  setState(() {}); // Refresh dialog
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        String? selectedDirectory = await FilePicker.platform
+                            .getDirectoryPath();
+                        if (selectedDirectory != null) {
+                          settings.addMusicPath(selectedDirectory);
+                          setState(() {});
+                        }
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text("Add Folder"),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Close"),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
