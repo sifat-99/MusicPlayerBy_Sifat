@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
       child: Consumer2<ThemeProvider, SettingsProvider>(
         builder: (context, themeProvider, settingsProvider, child) {
           return MaterialApp(
-            title: 'Audiofy',
+            title: 'ZOFIO',
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
               colorScheme: ColorScheme.fromSeed(

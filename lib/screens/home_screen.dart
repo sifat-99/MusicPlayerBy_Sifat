@@ -93,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             child: Text(
-              "Audiofy",
+              "ZOFIO",
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 color: Colors.white,

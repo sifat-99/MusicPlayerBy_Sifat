@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="Audiofy"
+        android:label="ZOFIO"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

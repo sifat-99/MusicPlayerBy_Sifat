@@ -37,7 +37,7 @@ class Sidebar extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Audiofy',
+                        'ZOFIO',
                         style: Theme.of(context).textTheme.headlineMedium
                             ?.copyWith(
                               color: Colors.white,

@@ -156,6 +156,14 @@ class AudioProvider extends ChangeNotifier {
   }
 
   Future<void> fetchSongs() async {
+    // Capture current playing state
+    int? currentSongId;
+    if (_currentIndex != -1 && _currentIndex < _filteredSongs.length) {
+      currentSongId = _filteredSongs[_currentIndex].id;
+    }
+    final wasPlaying = _isPlaying;
+    final currentPos = _audioPlayer.position;
+
     if (Platform.isMacOS) {
       await _fetchSongsMacOS();
     } else {
@@ -182,7 +190,11 @@ class AudioProvider extends ChangeNotifier {
 
     _filteredSongs = List.from(_songs);
     _groupSongsByFolder();
-    _updatePlaylist();
+    await _updatePlaylist(
+      preserveSongId: currentSongId,
+      preservePosition: currentPos,
+      wasPlaying: wasPlaying,
+    );
     notifyListeners();
   }
 
@@ -217,6 +229,14 @@ class AudioProvider extends ChangeNotifier {
   }
 
   void filterSongs(String query) {
+    // Capture current playing state
+    int? currentSongId;
+    if (_currentIndex != -1 && _currentIndex < _filteredSongs.length) {
+      currentSongId = _filteredSongs[_currentIndex].id;
+    }
+    final wasPlaying = _isPlaying;
+    final currentPos = _audioPlayer.position;
+
     // Apply min duration filter first
     var tempSongs = _songs.where((song) {
       return song.duration != null &&
@@ -232,11 +252,19 @@ class AudioProvider extends ChangeNotifier {
       }).toList();
     }
 
-    _updatePlaylist();
+    _updatePlaylist(
+      preserveSongId: currentSongId,
+      preservePosition: currentPos,
+      wasPlaying: wasPlaying,
+    );
     notifyListeners();
   }
 
-  Future<void> _updatePlaylist() async {
+  Future<void> _updatePlaylist({
+    int? preserveSongId,
+    Duration? preservePosition,
+    bool wasPlaying = false,
+  }) async {
     final audioSources = _filteredSongs.map((song) {
       return AudioSource.uri(
         song.uri != null ? Uri.parse(song.uri!) : Uri.file(song.data),
@@ -253,7 +281,32 @@ class AudioProvider extends ChangeNotifier {
     }).toList();
 
     _playlist = ConcatenatingAudioSource(children: audioSources);
-    await _audioPlayer.setAudioSource(_playlist!);
+
+    int initialIndex = 0;
+    Duration initialPosition = Duration.zero;
+    bool shouldPreserve = false;
+
+    if (preserveSongId != null) {
+      final index = _filteredSongs.indexWhere((s) => s.id == preserveSongId);
+      if (index != -1) {
+        initialIndex = index;
+        initialPosition = preservePosition ?? Duration.zero;
+        shouldPreserve = true;
+      }
+    }
+
+    if (shouldPreserve) {
+      await _audioPlayer.setAudioSource(
+        _playlist!,
+        initialIndex: initialIndex,
+        initialPosition: initialPosition,
+      );
+      if (wasPlaying) {
+        _audioPlayer.play();
+      }
+    } else {
+      await _audioPlayer.setAudioSource(_playlist!);
+    }
   }
 
   Future<void> playSong(int index) async {
