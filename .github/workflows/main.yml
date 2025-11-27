@@ -44,15 +44,15 @@ jobs:
       - name: Create DMG
         run: |
           create-dmg \
-            --volname "Audiofy" \
+            --volname "ZOFIO" \
             --window-pos 200 120 \
             --window-size 800 400 \
             --icon-size 100 \
-            --icon "Audiofy.app" 200 190 \
-            --hide-extension "Audiofy.app" \
+            --icon "ZOFIO.app" 200 190 \
+            --hide-extension "ZOFIO.app" \
             --app-drop-link 600 185 \
-            "Audiofy.dmg" \
-            "build/macos/Build/Products/Release/Audiofy.app"
+            "ZOFIO.dmg" \
+            "build/macos/Build/Products/Release/ZOFIO.app"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -64,7 +64,7 @@ jobs:
             Changes from commit ${{ github.sha }}.
           files: |
             build/app/outputs/flutter-apk/app-release.apk
-            Audiofy.dmg
+            ZOFIO.dmg
           draft: false
           prerelease: false
         env:
