@@ -13,6 +13,7 @@ Future<void> main() async {
     androidNotificationChannelId: 'com.sifat.dev.sifat_audio.channel.audio',
     androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
+    androidNotificationIcon: 'mipmap/launcher_icon',
   );
   runApp(const MyApp());
 }
