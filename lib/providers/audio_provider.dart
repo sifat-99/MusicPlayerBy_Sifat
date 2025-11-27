@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sifat_audio/providers/settings_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AudioProvider extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final OnAudioQuery _audioQuery = OnAudioQuery();
   late SettingsProvider _settingsProvider;
+  ConcatenatingAudioSource? _playlist;
 
   // Audio Effects
   double _speed = 1.0;
@@ -34,16 +37,23 @@ class AudioProvider extends ChangeNotifier {
   List<SongModel> _filteredSongs = [];
   List<ArtistModel> _artists = [];
   List<AlbumModel> _albums = [];
+  Map<String, List<SongModel>> _folders = {};
   int _currentIndex = -1;
   bool _isPlaying = false;
+  bool _isShuffleEnabled = false;
+  List<String> _favorites = [];
+  List<String> _cachedIgnoredPaths = [];
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
 
   List<SongModel> get songs => _filteredSongs;
   List<ArtistModel> get artists => _artists;
   List<AlbumModel> get albums => _albums;
+  Map<String, List<SongModel>> get folders => _folders;
   int get currentIndex => _currentIndex;
   bool get isPlaying => _isPlaying;
+  bool get isShuffleEnabled => _isShuffleEnabled;
+  List<String> get favorites => _favorites;
   Duration get duration => _duration;
   Duration get position => _position;
   SongModel? get currentSong =>
@@ -51,12 +61,32 @@ class AudioProvider extends ChangeNotifier {
 
   AudioProvider() {
     _initAudioPlayer();
+    _loadFavorites();
   }
 
   void updateSettings(SettingsProvider settings) {
     _settingsProvider = settings;
-    // Re-filter songs if minDuration changed
-    if (_songs.isNotEmpty) {
+
+    // Check if ignored paths changed
+    bool ignoredPathsChanged = false;
+    if (_cachedIgnoredPaths.length != settings.ignoredPaths.length) {
+      ignoredPathsChanged = true;
+    } else {
+      for (int i = 0; i < _cachedIgnoredPaths.length; i++) {
+        if (_cachedIgnoredPaths[i] != settings.ignoredPaths[i]) {
+          ignoredPathsChanged = true;
+          break;
+        }
+      }
+    }
+
+    if (ignoredPathsChanged) {
+      _cachedIgnoredPaths = List.from(settings.ignoredPaths);
+      // Re-fetch songs to apply new ignore rules
+      // Use microtask to avoid setState during build if this is called during build
+      Future.microtask(() => fetchSongs());
+    } else if (_songs.isNotEmpty) {
+      // Re-filter songs if minDuration changed (or other filterable settings)
       filterSongs(""); // Re-apply filter
     }
   }
@@ -77,9 +107,10 @@ class AudioProvider extends ChangeNotifier {
       notifyListeners();
     });
 
-    _audioPlayer.processingStateStream.listen((state) {
-      if (state == ProcessingState.completed) {
-        playNext();
+    _audioPlayer.currentIndexStream.listen((index) {
+      if (index != null) {
+        _currentIndex = index;
+        notifyListeners();
       }
     });
   }
@@ -110,7 +141,23 @@ class AudioProvider extends ChangeNotifier {
       uriType: UriType.EXTERNAL,
       ignoreCase: true,
     );
+
+    // Filter out ignored paths
+    if (_settingsProvider.ignoredPaths.isNotEmpty) {
+      _songs = _songs.where((song) {
+        if (song.data.isEmpty) return true;
+        for (var ignoredPath in _settingsProvider.ignoredPaths) {
+          if (song.data.startsWith(ignoredPath)) {
+            return false;
+          }
+        }
+        return true;
+      }).toList();
+    }
+
     _filteredSongs = List.from(_songs);
+    _groupSongsByFolder();
+    _updatePlaylist();
     notifyListeners();
   }
 
@@ -149,28 +196,39 @@ class AudioProvider extends ChangeNotifier {
             (song.artist?.toLowerCase().contains(query.toLowerCase()) ?? false);
       }).toList();
     }
+
+    _updatePlaylist();
     notifyListeners();
+  }
+
+  Future<void> _updatePlaylist() async {
+    final audioSources = _filteredSongs.map((song) {
+      return AudioSource.uri(
+        Uri.parse(song.uri!),
+        tag: MediaItem(
+          id: song.id.toString(),
+          album: song.album ?? "Unknown Album",
+          title: song.title,
+          artist: song.artist ?? "Unknown Artist",
+          artUri: Uri.parse(
+            "content://media/external/audio/media/${song.id}/albumart",
+          ),
+        ),
+      );
+    }).toList();
+
+    _playlist = ConcatenatingAudioSource(children: audioSources);
+    await _audioPlayer.setAudioSource(_playlist!);
   }
 
   Future<void> playSong(int index) async {
     try {
-      _currentIndex = index;
-      var song = _filteredSongs[index];
+      // If the playlist hasn't been set or is different (which shouldn't happen if we update on filter),
+      // we just seek.
+      // But wait, if we just initialized, we might need to set source?
+      // _updatePlaylist sets the source.
 
-      // Create MediaItem for notification
-      final mediaItem = MediaItem(
-        id: song.id.toString(),
-        album: song.album ?? "Unknown Album",
-        title: song.title,
-        artist: song.artist ?? "Unknown Artist",
-        artUri: Uri.parse(
-          "content://media/external/audio/media/${song.id}/albumart",
-        ),
-      );
-
-      await _audioPlayer.setAudioSource(
-        AudioSource.uri(Uri.parse(song.uri!), tag: mediaItem),
-      );
+      await _audioPlayer.seek(Duration.zero, index: index);
       await _audioPlayer.play();
     } catch (e) {
       debugPrint("Error playing song: $e");
@@ -190,24 +248,73 @@ class AudioProvider extends ChangeNotifier {
   }
 
   Future<void> playNext() async {
-    if (_currentIndex < _filteredSongs.length - 1) {
-      await playSong(_currentIndex + 1);
-    } else {
-      // Loop back to start or stop? Let's loop for now or just stop.
-      // Simple player: loop to first if at end.
-      if (_filteredSongs.isNotEmpty) {
-        await playSong(0);
-      }
+    if (_audioPlayer.hasNext) {
+      await _audioPlayer.seekToNext();
     }
   }
 
   Future<void> playPrevious() async {
-    if (_currentIndex > 0) {
-      await playSong(_currentIndex - 1);
+    if (_audioPlayer.hasPrevious) {
+      await _audioPlayer.seekToPrevious();
+    }
+  }
+
+  Future<void> toggleShuffle() async {
+    _isShuffleEnabled = !_isShuffleEnabled;
+    await _audioPlayer.setShuffleModeEnabled(_isShuffleEnabled);
+    notifyListeners();
+  }
+
+  bool isFavorite(int id) {
+    return _favorites.contains(id.toString());
+  }
+
+  Future<void> toggleFavorite(int id) async {
+    final String idStr = id.toString();
+    if (_favorites.contains(idStr)) {
+      _favorites.remove(idStr);
     } else {
-      if (_filteredSongs.isNotEmpty) {
-        await playSong(_filteredSongs.length - 1);
+      _favorites.add(idStr);
+    }
+    notifyListeners();
+    await _saveFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    _favorites = prefs.getStringList('favorites') ?? [];
+    notifyListeners();
+  }
+
+  Future<void> _saveFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('favorites', _favorites);
+  }
+
+  List<SongModel> get favoriteSongs {
+    return _songs
+        .where((song) => _favorites.contains(song.id.toString()))
+        .toList();
+  }
+
+  void _groupSongsByFolder() {
+    _folders.clear();
+    for (var song in _songs) {
+      // song.data contains the absolute path
+      // We need to be careful if data is null or empty, though usually it's not for valid songs
+      if (song.data.isNotEmpty) {
+        final directory = p.dirname(song.data);
+        // final folderName = p.basename(directory); // Removed unused variable
+
+        // We can use the full path as key to avoid collisions, but display folderName
+        // Or just use folderName if we want to group by name (risk of collision)
+        // Let's use directory path as key
+        if (!_folders.containsKey(directory)) {
+          _folders[directory] = [];
+        }
+        _folders[directory]!.add(song);
       }
     }
+    notifyListeners();
   }
 }

@@ -7,6 +7,7 @@ import 'package:sifat_audio/widgets/artist_list.dart';
 import 'package:sifat_audio/widgets/mini_player.dart';
 import 'package:sifat_audio/widgets/sidebar.dart';
 import 'package:sifat_audio/widgets/song_tile.dart';
+import 'package:sifat_audio/widgets/folder_list.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -76,17 +77,29 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         extendBodyBehindAppBar: true,
         drawer: const Sidebar(),
         appBar: AppBar(
-          title: const Text(
-            "Sifat Audio",
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 28,
-              letterSpacing: 1.2,
+          title: GestureDetector(
+            onTap: () {
+              if (_scrollController.hasClients) {
+                _scrollController.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeInOut,
+                );
+              }
+            },
+            child: Text(
+              "Audiofy",
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                fontSize: 28,
+                letterSpacing: 1.2,
+              ),
             ),
           ),
           centerTitle: true,
@@ -115,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Tab(text: "Songs"),
               Tab(text: "Artists"),
               Tab(text: "Albums"),
+              Tab(text: "Folders"),
             ],
           ),
         ),
@@ -205,94 +219,114 @@ class _HomeScreenState extends State<HomeScreen> {
                             return Row(
                               children: [
                                 Expanded(
-                                  child: ListView.builder(
-                                    controller: _scrollController,
-                                    padding: const EdgeInsets.only(
-                                      bottom: 80,
-                                    ), // Space for MiniPlayer
-                                    itemCount: audioProvider.songs.length,
-                                    itemBuilder: (context, index) {
-                                      final song = audioProvider.songs[index];
-                                      return TweenAnimationBuilder<double>(
-                                        tween: Tween(begin: 0.0, end: 1.0),
-                                        duration: Duration(
-                                          milliseconds: 300 + (index * 50),
-                                        ),
-                                        curve: Curves.easeOut,
-                                        builder: (context, value, child) {
-                                          return Transform.translate(
-                                            offset: Offset(0, 50 * (1 - value)),
-                                            child: Opacity(
-                                              opacity: value,
-                                              child: child,
+                                  child: RefreshIndicator(
+                                    onRefresh: () async {
+                                      await audioProvider.fetchSongs();
+                                    },
+                                    child: Scrollbar(
+                                      controller: _scrollController,
+                                      thumbVisibility: true,
+                                      interactive: true,
+                                      radius: const Radius.circular(10),
+                                      thickness: 6,
+                                      child: ListView.builder(
+                                        controller: _scrollController,
+                                        padding: const EdgeInsets.only(
+                                          bottom: 80,
+                                          right:
+                                              10, // Add padding for scrollbar
+                                        ), // Space for MiniPlayer
+                                        itemCount: audioProvider.songs.length,
+                                        itemBuilder: (context, index) {
+                                          final song =
+                                              audioProvider.songs[index];
+                                          return TweenAnimationBuilder<double>(
+                                            tween: Tween(begin: 0.0, end: 1.0),
+                                            duration: Duration(
+                                              milliseconds: 300 + (index * 50),
+                                            ),
+                                            curve: Curves.easeOut,
+                                            builder: (context, value, child) {
+                                              return Transform.translate(
+                                                offset: Offset(
+                                                  0,
+                                                  50 * (1 - value),
+                                                ),
+                                                child: Opacity(
+                                                  opacity: value,
+                                                  child: child,
+                                                ),
+                                              );
+                                            },
+                                            child: SongTile(
+                                              song: song,
+                                              isPlaying:
+                                                  audioProvider.currentIndex ==
+                                                      index &&
+                                                  audioProvider.isPlaying,
+                                              onTap: () {
+                                                audioProvider.playSong(index);
+                                                Navigator.push(
+                                                  context,
+                                                  PageRouteBuilder(
+                                                    pageBuilder:
+                                                        (
+                                                          context,
+                                                          animation,
+                                                          secondaryAnimation,
+                                                        ) => const PlayerScreen(
+                                                          heroTagPrefix:
+                                                              'list_artwork_',
+                                                        ),
+                                                    transitionsBuilder:
+                                                        (
+                                                          context,
+                                                          animation,
+                                                          secondaryAnimation,
+                                                          child,
+                                                        ) {
+                                                          const begin = Offset(
+                                                            0.0,
+                                                            1.0,
+                                                          );
+                                                          const end =
+                                                              Offset.zero;
+                                                          const curve =
+                                                              Curves.ease;
+
+                                                          var tween =
+                                                              Tween(
+                                                                begin: begin,
+                                                                end: end,
+                                                              ).chain(
+                                                                CurveTween(
+                                                                  curve: curve,
+                                                                ),
+                                                              );
+
+                                                          return SlideTransition(
+                                                            position: animation
+                                                                .drive(tween),
+                                                            child: child,
+                                                          );
+                                                        },
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           );
                                         },
-                                        child: SongTile(
-                                          song: song,
-                                          isPlaying:
-                                              audioProvider.currentIndex ==
-                                                  index &&
-                                              audioProvider.isPlaying,
-                                          onTap: () {
-                                            audioProvider.playSong(index);
-                                            Navigator.push(
-                                              context,
-                                              PageRouteBuilder(
-                                                pageBuilder:
-                                                    (
-                                                      context,
-                                                      animation,
-                                                      secondaryAnimation,
-                                                    ) => const PlayerScreen(
-                                                      heroTagPrefix:
-                                                          'list_artwork_',
-                                                    ),
-                                                transitionsBuilder:
-                                                    (
-                                                      context,
-                                                      animation,
-                                                      secondaryAnimation,
-                                                      child,
-                                                    ) {
-                                                      const begin = Offset(
-                                                        0.0,
-                                                        1.0,
-                                                      );
-                                                      const end = Offset.zero;
-                                                      const curve = Curves.ease;
-
-                                                      var tween =
-                                                          Tween(
-                                                            begin: begin,
-                                                            end: end,
-                                                          ).chain(
-                                                            CurveTween(
-                                                              curve: curve,
-                                                            ),
-                                                          );
-
-                                                      return SlideTransition(
-                                                        position: animation
-                                                            .drive(tween),
-                                                        child: child,
-                                                      );
-                                                    },
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      );
-                                    },
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 Container(
                                   width: 30,
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.transparent,
                                   child: GestureDetector(
                                     onVerticalDragUpdate: (details) {
                                       final index =
-                                          (details.localPosition.dy / 20)
+                                          (details.localPosition.dy / 15)
                                               .floor();
                                       if (index >= 0 &&
                                           index < _alphabet.length) {
@@ -318,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             );
                                           },
                                           child: Container(
-                                            height: 20,
+                                            height: 24,
                                             alignment: Alignment.center,
                                             child: Text(
                                               letter,
@@ -328,7 +362,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                                         context,
                                                       ).colorScheme.primary
                                                     : Colors.white,
-                                                fontSize: isActive ? 14 : 10,
+                                                fontSize: isActive ? 20 : 10,
+                                                height: 1.2,
                                                 fontWeight: isActive
                                                     ? FontWeight.w900
                                                     : FontWeight.normal,
@@ -347,7 +382,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         // Artists Tab
                         const ArtistList(),
                         // Albums Tab
+                        // Albums Tab
                         const AlbumList(),
+                        // Folders Tab
+                        const FolderList(),
                       ],
                     ),
                   ),

@@ -10,7 +10,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 Future<void> main() async {
   await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
+    androidNotificationChannelId: 'com.sifat.dev.sifat_audio.channel.audio',
     androidNotificationChannelName: 'Audio playback',
     androidNotificationOngoing: true,
   );
@@ -37,7 +37,7 @@ class MyApp extends StatelessWidget {
       child: Consumer2<ThemeProvider, SettingsProvider>(
         builder: (context, themeProvider, settingsProvider, child) {
           return MaterialApp(
-            title: 'Sweet Audio',
+            title: 'Audiofy',
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
               colorScheme: ColorScheme.fromSeed(

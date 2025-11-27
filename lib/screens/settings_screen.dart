@@ -3,7 +3,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:sifat_audio/providers/settings_provider.dart';
 import 'package:sifat_audio/providers/theme_provider.dart';
+import 'package:sifat_audio/providers/audio_provider.dart';
 import 'package:sifat_audio/screens/equalizer_screen.dart';
+import 'package:path/path.dart' as p;
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -101,8 +103,8 @@ class SettingsScreen extends StatelessWidget {
                   context,
                   icon: Icons.create_new_folder,
                   title: "Ignored Paths",
-                  subtitle: "Select folders to ignore (Coming Soon)",
-                  onTap: () {},
+                  subtitle: "Select folders to ignore",
+                  onTap: () => _showIgnoredPathsDialog(context, settings),
                 ),
 
                 _buildSectionHeader(context, "Audio"),
@@ -318,6 +320,134 @@ class SettingsScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  void _showIgnoredPathsDialog(
+    BuildContext context,
+    SettingsProvider settings,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Ignored Paths"),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (settings.ignoredPaths.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text("No ignored paths"),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: settings.ignoredPaths.length,
+                          itemBuilder: (context, index) {
+                            final path = settings.ignoredPaths[index];
+                            return ListTile(
+                              title: Text(
+                                path,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () {
+                                  settings.removeIgnoredPath(path);
+                                  setState(() {}); // Refresh dialog
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        _showAddPathDialog(context, settings, setState);
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text("Add Path"),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Close"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAddPathDialog(
+    BuildContext context,
+    SettingsProvider settings,
+    StateSetter parentSetState,
+  ) {
+    final audioProvider = Provider.of<AudioProvider>(context, listen: false);
+    final folders = audioProvider.folders.keys.toList();
+
+    // Filter out already ignored paths
+    final availableFolders = folders
+        .where((path) => !settings.ignoredPaths.contains(path))
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Select Folder to Ignore"),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: availableFolders.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text("No new folders found to ignore."),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: availableFolders.length,
+                  itemBuilder: (context, index) {
+                    final path = availableFolders[index];
+                    final folderName = p.basename(path);
+                    return ListTile(
+                      leading: const Icon(Icons.folder),
+                      title: Text(folderName),
+                      subtitle: Text(
+                        path,
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      onTap: () {
+                        settings.addIgnoredPath(path);
+                        parentSetState(() {}); // Refresh parent dialog
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+        ],
+      ),
     );
   }
 }

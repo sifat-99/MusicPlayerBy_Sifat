@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sifat_audio/providers/theme_provider.dart';
 import 'package:sifat_audio/screens/settings_screen.dart';
+import 'package:sifat_audio/screens/favorites_screen.dart';
 
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key});
@@ -36,7 +37,7 @@ class Sidebar extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Sifat Audio',
+                        'Audiofy',
                         style: Theme.of(context).textTheme.headlineMedium
                             ?.copyWith(
                               color: Colors.white,
@@ -45,6 +46,22 @@ class Sidebar extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.favorite, color: Colors.white),
+                  title: const Text(
+                    'Favorites',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const FavoritesScreen(),
+                      ),
+                    );
+                  },
                 ),
                 ListTile(
                   leading: const Icon(Icons.settings, color: Colors.white),
@@ -85,6 +102,22 @@ class Sidebar extends StatelessWidget {
                           Colors.pink,
                           Colors.teal,
                           Colors.indigo,
+                          Colors.cyan,
+                          Colors.lime,
+                          Colors.purple,
+                          Colors.blueGrey,
+                          Colors.brown,
+                          Colors.deepOrange,
+                          Colors.greenAccent,
+                          Colors.indigoAccent,
+                          Colors.orangeAccent,
+                          Colors.pinkAccent,
+                          Colors.purpleAccent,
+                          Colors.redAccent,
+                          Colors.tealAccent,
+                          Colors.yellowAccent,
+                          Colors.grey,
+                          Colors.black,
                         ].map((color) {
                           return GestureDetector(
                             onTap: () {

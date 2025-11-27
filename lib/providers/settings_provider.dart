@@ -6,6 +6,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _autoPlay = true;
   int _minDuration = 0; // Seconds
   String _audioQuality = 'High';
+  List<String> _ignoredPaths = [];
 
   double _fontSize = 1.0;
 
@@ -14,6 +15,7 @@ class SettingsProvider extends ChangeNotifier {
   int get minDuration => _minDuration;
   String get audioQuality => _audioQuality;
   double get fontSize => _fontSize;
+  List<String> get ignoredPaths => _ignoredPaths;
 
   SettingsProvider() {
     _loadSettings();
@@ -26,6 +28,7 @@ class SettingsProvider extends ChangeNotifier {
     _minDuration = prefs.getInt('minDuration') ?? 0;
     _audioQuality = prefs.getString('audioQuality') ?? 'High';
     _fontSize = prefs.getDouble('fontSize') ?? 1.0;
+    _ignoredPaths = prefs.getStringList('ignoredPaths') ?? [];
     notifyListeners();
   }
 
@@ -62,5 +65,21 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('fontSize', size);
+  }
+
+  Future<void> addIgnoredPath(String path) async {
+    if (!_ignoredPaths.contains(path)) {
+      _ignoredPaths.add(path);
+      notifyListeners();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('ignoredPaths', _ignoredPaths);
+    }
+  }
+
+  Future<void> removeIgnoredPath(String path) async {
+    _ignoredPaths.remove(path);
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('ignoredPaths', _ignoredPaths);
   }
 }
