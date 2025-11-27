@@ -6,6 +6,7 @@ import 'package:sifat_audio/providers/theme_provider.dart';
 import 'package:sifat_audio/providers/audio_provider.dart';
 import 'package:sifat_audio/screens/equalizer_screen.dart';
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -138,12 +139,30 @@ class SettingsScreen extends StatelessWidget {
                   context,
                   icon: Icons.info,
                   title: "About App",
-                  subtitle: "Version 1.0.0",
+                  subtitle: "Version 1.0.0 (Developed by Sifat)",
+                  trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                   onTap: () => showAboutDialog(
                     context: context,
                     applicationName: "Sifat Audio",
                     applicationVersion: "1.0.0",
                     applicationLegalese: "© 2024 Sifat Dev",
+                    children: [
+                      TextButton(
+                        onPressed: () async {
+                          final Uri url = Uri.parse(
+                            'https://github.com/sifat-99',
+                          );
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Could not launch $url')),
+                            );
+                          }
+                        },
+                        child: const Text('View on GitHub'),
+                      ),
+                    ],
                   ),
                 ),
               ],
