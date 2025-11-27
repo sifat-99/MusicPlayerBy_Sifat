@@ -1,0 +1,71 @@
+name: Build and Release Flutter APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Build macOS App
+        run: flutter build macos --release
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "Audiofy" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "Audiofy.app" 200 190 \
+            --hide-extension "Audiofy.app" \
+            --app-drop-link 600 185 \
+            "Audiofy.dmg" \
+            "build/macos/Build/Products/Release/Audiofy.app"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+            Automated release of the Flutter App.
+            Changes from commit ${{ github.sha }}.
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            Audiofy.dmg
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN_MUSIC }}
