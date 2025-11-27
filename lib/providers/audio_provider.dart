@@ -295,17 +295,22 @@ class AudioProvider extends ChangeNotifier {
       }
     }
 
-    if (shouldPreserve) {
-      await _audioPlayer.setAudioSource(
-        _playlist!,
-        initialIndex: initialIndex,
-        initialPosition: initialPosition,
-      );
-      if (wasPlaying) {
-        _audioPlayer.play();
+    try {
+      if (shouldPreserve) {
+        await _audioPlayer.setAudioSource(
+          _playlist!,
+          initialIndex: initialIndex,
+          initialPosition: initialPosition,
+        );
+        if (wasPlaying) {
+          _audioPlayer.play();
+        }
+      } else {
+        await _audioPlayer.setAudioSource(_playlist!);
       }
-    } else {
-      await _audioPlayer.setAudioSource(_playlist!);
+    } catch (e) {
+      debugPrint("Error updating playlist: $e");
+      // Ignore "Loading interrupted" errors as they are expected when rapid updates occur
     }
   }
 

@@ -1,4 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.gradle.api.plugins.JavaPlugin
+import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.jvm.toolchain.JavaLanguageVersion
 
 allprojects {
     repositories {
@@ -40,18 +43,34 @@ subprojects {
     }
 
     // Fix JVM target inconsistency
-    tasks.withType<KotlinCompile>().configureEach {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    // Force everything to 17, handling both evaluated and non-evaluated projects
+    val configureJvm = {
+        tasks.withType<JavaCompile>().configureEach {
+            sourceCompatibility = "17"
+            targetCompatibility = "17"
+        }
+
+        tasks.withType<KotlinCompile>().configureEach {
+            compilerOptions {
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            }
+        }
+
+        project.plugins.withId("com.android.library") {
+            project.extensions.configure<com.android.build.gradle.LibraryExtension> {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+            }
         }
     }
 
-    project.plugins.withId("com.android.library") {
-        project.extensions.configure<com.android.build.gradle.LibraryExtension> {
-            compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
-            }
+    if (project.state.executed) {
+        configureJvm()
+    } else {
+        project.afterEvaluate {
+            configureJvm()
         }
     }
 }
