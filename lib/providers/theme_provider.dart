@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  Color _primaryColor = Colors.deepPurple;
+  Color _primaryColor = const Color(0xFFEDC25E);
   static const String _colorKey = 'primary_color';
 
   Color get primaryColor => _primaryColor;
