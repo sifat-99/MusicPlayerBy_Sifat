@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 
 import 'package:provider/provider.dart';
 import 'package:sifat_audio/providers/audio_provider.dart';
@@ -19,47 +20,57 @@ class ArtistList extends StatelessWidget {
           );
         }
         return ListView.builder(
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: audioProvider.artists.length,
           itemBuilder: (context, index) {
             final artist = audioProvider.artists[index];
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
               ),
-              child: ListTile(
-                leading: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.person, color: Colors.white),
+              leading: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                title: Text(
-                  artist.artist,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                child: ClipOval(
+                  child: QueryArtworkWidget(
+                    id: artist.id,
+                    type: ArtworkType.ARTIST,
+                    keepOldArtwork: true,
+                    nullArtworkWidget: const Icon(
+                      Icons.person,
+                      color: Colors.white54,
+                      size: 30,
+                    ),
                   ),
-                ),
-                subtitle: Text(
-                  "${artist.numberOfTracks} Songs",
-                  style: TextStyle(color: Colors.grey[400]),
                 ),
               ),
+              title: Text(
+                artist.artist,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+              subtitle: Text(
+                "${artist.numberOfTracks} Songs",
+                style: TextStyle(color: Colors.white.withOpacity(0.6)),
+              ),
+              onTap: () {
+                // TODO: Navigate to Artist Details
+              },
             );
           },
         );

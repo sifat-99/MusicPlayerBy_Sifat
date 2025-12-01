@@ -24,21 +24,20 @@ class AlbumList extends StatelessWidget {
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.8,
+            childAspectRatio: 0.85,
           ),
           itemCount: audioProvider.albums.length,
           itemBuilder: (context, index) {
             final album = audioProvider.albums[index];
             return Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -48,7 +47,7 @@ class AlbumList extends StatelessWidget {
                   Expanded(
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
+                        top: Radius.circular(20),
                       ),
                       child: QueryArtworkWidget(
                         id: album.id,
@@ -57,19 +56,19 @@ class AlbumList extends StatelessWidget {
                         artworkFit: BoxFit.cover,
                         artworkWidth: double.infinity,
                         nullArtworkWidget: Container(
-                          color: Colors.grey[800],
+                          color: const Color(0xFF2A2A2A),
                           width: double.infinity,
                           child: const Icon(
                             Icons.album,
                             size: 50,
-                            color: Colors.white,
+                            color: Colors.white54,
                           ),
                         ),
                       ),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(12.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -80,14 +79,16 @@ class AlbumList extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           album.artist ?? "Unknown Artist",
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.grey[400],
+                            color: Colors.white.withOpacity(0.6),
                             fontSize: 12,
                           ),
                         ),
