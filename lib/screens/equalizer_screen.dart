@@ -20,7 +20,7 @@ class EqualizerScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
+              Theme.of(context).colorScheme.primary.withOpacity(0.2),
               Colors.black,
             ],
           ),
