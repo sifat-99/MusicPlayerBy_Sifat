@@ -38,33 +38,35 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
-      - name: Build macOS App
-        run: flutter build macos --release
-
-      - name: Create DMG
-        run: |
-          create-dmg \
-            --volname "ZOFIO" \
-            --window-pos 200 120 \
-            --window-size 800 400 \
-            --icon-size 100 \
-            --icon "ZOFIO.app" 200 190 \
-            --hide-extension "ZOFIO.app" \
-            --app-drop-link 600 185 \
-            "ZOFIO.dmg" \
-            "build/macos/Build/Products/Release/ZOFIO.app"
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
           body: |
-            Automated release of the Flutter App.
-            Changes from commit ${{ github.sha }}.
+            ## 🚀 What's New in v${{ github.run_number }}
+
+            ### ✨ New Features
+            *   **Dynamic Theme Engine**: Customize the app's look with a color picker.
+            *   **Glassmorphism UI**: Modern, frosted-glass effect on navigation bars, search bars, and mini-player.
+            *   **Waveform Progress Bar**: Visualizing playback progress with a dynamic waveform.
+            *   **Glowing Artwork**: Pulsating glow animation on the player screen.
+            *   **Quick Picks Source Indicators**: Icons to distinguish Online (Cloud) vs. Local (SD Card) songs.
+            *   **User Accounts**: Google Sign-In integration with profile avatar and logout functionality.
+            *   **Local Songs Tab**: Enhanced with Search, A-Z Sidebar, and Scrollbar.
+            *   **Muxed Stream Support**: Reliable YouTube playback and downloads using video+audio streams.
+            *   **Swipe-to-Close Mini Player**: Improved gesture control.
+
+            ### 🐛 Fixes & Improvements
+            *   Fixed `SocketTimeoutException` and `403 Forbidden` errors for online playback.
+            *   Fixed Android 11+ download permissions and file visibility.
+            *   Resolved UI overlaps (Notification bar, Sidebar, Player screen).
+            *   Improved app responsiveness and instant playback feedback.
+            *   Fixed online-to-local playback switching issues.
+
+            *Automated release from commit ${{ github.sha }}*
           files: |
             build/app/outputs/flutter-apk/app-release.apk
-            ZOFIO.dmg
           draft: false
           prerelease: false
         env:
