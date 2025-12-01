@@ -5,15 +5,17 @@ import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:mime/mime.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sifat_audio/providers/settings_provider.dart';
+import 'package:sifat_audio/services/youtube_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AudioProvider extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final OnAudioQuery _audioQuery = OnAudioQuery();
+  final YouTubeService _youtubeService = YouTubeService();
   late SettingsProvider _settingsProvider;
   ConcatenatingAudioSource? _playlist;
 
@@ -60,8 +62,15 @@ class AudioProvider extends ChangeNotifier {
   List<String> get favorites => _favorites;
   Duration get duration => _duration;
   Duration get position => _position;
-  SongModel? get currentSong =>
-      _currentIndex != -1 ? _filteredSongs[_currentIndex] : null;
+  SongModel? _streamSong;
+
+  SongModel? get currentSong {
+    if (_streamSong != null) return _streamSong;
+    if (_currentIndex != -1 && _currentIndex < _filteredSongs.length) {
+      return _filteredSongs[_currentIndex];
+    }
+    return null;
+  }
 
   AudioProvider() {
     _initAudioPlayer();
@@ -146,6 +155,13 @@ class AudioProvider extends ChangeNotifier {
         await Permission.audio.request();
       }
     }
+
+    if (Platform.isIOS) {
+      var mediaLibraryStatus = await Permission.mediaLibrary.status;
+      if (!mediaLibraryStatus.isGranted) {
+        await Permission.mediaLibrary.request();
+      }
+    }
     // On macOS, permissions are handled by entitlements and system prompts when accessing files.
 
     fetchAll();
@@ -167,12 +183,43 @@ class AudioProvider extends ChangeNotifier {
     if (Platform.isMacOS) {
       await _fetchSongsMacOS();
     } else {
-      _songs = await _audioQuery.querySongs(
+      // Query system library
+      var systemSongs = await _audioQuery.querySongs(
         sortType: null,
         orderType: OrderType.ASC_OR_SMALLER,
         uriType: UriType.EXTERNAL,
         ignoreCase: true,
       );
+
+      // Scan app documents for downloaded files (iOS/Android)
+      List<SongModel> localDownloads = [];
+      try {
+        final dir = await getApplicationDocumentsDirectory();
+        if (await dir.exists()) {
+          await _scanDirectory(dir, localDownloads);
+        }
+
+        // Android: Also scan the public Music/Zofio directory
+        if (Platform.isAndroid) {
+          final zofioDir = Directory('/storage/emulated/0/Music/Zofio');
+          if (await zofioDir.exists()) {
+            await _scanDirectory(zofioDir, localDownloads);
+          }
+        }
+      } catch (e) {
+        debugPrint("Error scanning local files: $e");
+      }
+
+      // Merge system songs and local downloads
+      // Avoid duplicates based on path
+      final systemPaths = systemSongs.map((s) => s.data).toSet();
+      for (var song in localDownloads) {
+        if (!systemPaths.contains(song.data)) {
+          systemSongs.add(song);
+        }
+      }
+
+      _songs = systemSongs;
     }
 
     // Filter out ignored paths
@@ -265,20 +312,28 @@ class AudioProvider extends ChangeNotifier {
     Duration? preservePosition,
     bool wasPlaying = false,
   }) async {
-    final audioSources = _filteredSongs.map((song) {
-      return AudioSource.uri(
-        song.uri != null ? Uri.parse(song.uri!) : Uri.file(song.data),
-        tag: MediaItem(
-          id: song.id.toString(),
-          album: song.album ?? "Unknown Album",
-          title: song.title,
-          artist: song.artist ?? "Unknown Artist",
-          artUri: Uri.parse(
-            "content://media/external/audio/media/${song.id}/albumart",
-          ),
-        ),
-      );
-    }).toList();
+    _streamSong = null; // Clear stream song when updating playlist
+    final audioSources = _filteredSongs
+        .where((song) {
+          // Ensure we have a valid source
+          return (song.uri != null && song.uri!.isNotEmpty) ||
+              song.data.isNotEmpty;
+        })
+        .map((song) {
+          return AudioSource.uri(
+            song.uri != null ? Uri.parse(song.uri!) : Uri.file(song.data),
+            tag: MediaItem(
+              id: song.id.toString(),
+              album: song.album ?? "Unknown Album",
+              title: song.title,
+              artist: song.artist ?? "Unknown Artist",
+              artUri: Uri.parse(
+                "content://media/external/audio/media/${song.id}/albumart",
+              ),
+            ),
+          );
+        })
+        .toList();
 
     _playlist = ConcatenatingAudioSource(children: audioSources);
 
@@ -316,15 +371,107 @@ class AudioProvider extends ChangeNotifier {
 
   Future<void> playSong(int index) async {
     try {
-      // If the playlist hasn't been set or is different (which shouldn't happen if we update on filter),
-      // we just seek.
-      // But wait, if we just initialized, we might need to set source?
-      // _updatePlaylist sets the source.
+      _streamSong = null; // Ensure we are not in stream mode
+
+      // Check if we need to restore the full playlist (e.g. after playing a single stream)
+      if (_playlist == null || _playlist!.length != _filteredSongs.length) {
+        await _updatePlaylist();
+      }
 
       await _audioPlayer.seek(Duration.zero, index: index);
       await _audioPlayer.play();
     } catch (e) {
       debugPrint("Error playing song: $e");
+    }
+  }
+
+  Future<void> playUrl(
+    String url,
+    String title,
+    String artist,
+    String artworkUrl,
+  ) async {
+    try {
+      // Extract Video ID if a full URL is passed
+      String videoId = url;
+      final RegExp idRegExp = RegExp(r'(?<=v=)[a-zA-Z0-9_-]{11}');
+      final RegExp shortIdRegExp = RegExp(r'(?<=youtu\.be\/)[a-zA-Z0-9_-]{11}');
+
+      if (url.contains('http')) {
+        if (idRegExp.hasMatch(url)) {
+          videoId = idRegExp.firstMatch(url)!.group(0)!;
+        } else if (shortIdRegExp.hasMatch(url)) {
+          videoId = shortIdRegExp.firstMatch(url)!.group(0)!;
+        }
+      }
+
+      // INSTANT UI UPDATE: Set the song model immediately so the UI shows it
+      _streamSong = SongModel({
+        '_id': videoId.hashCode,
+        'title': title,
+        'artist': artist,
+        '_data': '', // Placeholder, will be updated
+        '_uri': '', // Placeholder
+        'album': 'YouTube Music',
+        'duration': 0,
+        'is_music': true,
+        'artwork_url': artworkUrl,
+      });
+      notifyListeners();
+
+      // Stop current playback
+      await _audioPlayer.stop();
+
+      // Ensure proxy is started
+      await _youtubeService.startProxy();
+
+      // Fetch stream info and cache it
+      final streamInfo = await _youtubeService.getBestStreamInfo(videoId);
+
+      if (streamInfo == null) {
+        debugPrint("Error: Could not resolve audio stream for $videoId");
+        return;
+      }
+
+      _youtubeService.cacheStreamInfo(videoId, streamInfo);
+
+      // Get proxy URL
+      final proxyUrl = _youtubeService.getProxyUrl(videoId);
+
+      // Update the model with the actual proxy URL
+      _streamSong = SongModel({
+        '_id': videoId.hashCode,
+        'title': title,
+        'artist': artist,
+        '_data': proxyUrl,
+        '_uri': proxyUrl,
+        'album': 'YouTube Music',
+        'duration': 0,
+        'is_music': true,
+        'artwork_url': artworkUrl,
+      });
+
+      final source = AudioSource.uri(
+        Uri.parse(proxyUrl),
+        tag: MediaItem(
+          id: videoId,
+          album: "YouTube Music",
+          title: title,
+          artist: artist,
+          artUri: Uri.parse(artworkUrl),
+        ),
+      );
+
+      // We are playing a single stream, so we replace the playlist
+      _playlist = ConcatenatingAudioSource(children: [source]);
+      await _audioPlayer.setAudioSource(_playlist!);
+      await _audioPlayer.play();
+
+      // Update current index manually since it's a new playlist
+      _currentIndex = 0;
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error playing URL: $e");
     }
   }
 
@@ -351,6 +498,15 @@ class AudioProvider extends ChangeNotifier {
       await _audioPlayer.seekToPrevious();
     }
   }
+
+  Future<void> stop() async {
+    await _audioPlayer.stop();
+    _streamSong = null;
+    _currentIndex = -1; // Reset index to ensure currentSong returns null
+    notifyListeners();
+  }
+
+  bool get isStream => _streamSong != null;
 
   Future<void> toggleShuffle() async {
     _isShuffleEnabled = !_isShuffleEnabled;
@@ -442,15 +598,20 @@ class AudioProvider extends ChangeNotifier {
           // Recursive scan
           await _scanDirectory(entity, songs);
         } else if (entity is File) {
+          // Check file size to avoid empty/corrupt downloads
+          if (await entity.length() < 1024 * 100) {
+            continue;
+          }
+
           String? mimeType = lookupMimeType(entity.path);
-          if (mimeType != null && mimeType.startsWith('audio/')) {
+          // Allow audio/* and video/webm (often used for audio-only webm files) and video/mp4
+          if (mimeType != null &&
+              (mimeType.startsWith('audio/') ||
+                  mimeType == 'video/webm' ||
+                  mimeType == 'video/mp4')) {
             // Create a SongModel manually
-            // Note: Metadata extraction is limited without a proper tag reader.
-            // We'll use filename as title for now.
             String filename = p.basename(entity.path);
             String title = p.basenameWithoutExtension(entity.path);
-
-            // Generate a pseudo-ID based on path hash
             int id = entity.path.hashCode;
 
             songs.add(
@@ -461,9 +622,9 @@ class AudioProvider extends ChangeNotifier {
                 'title': title,
                 'artist': 'Unknown Artist',
                 'album': 'Unknown Album',
-                'duration': 0, // Duration requires reading the file
+                'duration': 0,
                 'is_music': true,
-                '_uri': Uri.file(entity.path).toString(),
+                // '_uri': Let _updatePlaylist handle it via Uri.file(_data)
               }),
             );
           }
@@ -471,6 +632,119 @@ class AudioProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint("Error scanning directory: $e");
+    }
+  }
+
+  final Set<String> _downloadingIds = {};
+
+  bool isDownloading(String id) => _downloadingIds.contains(id);
+
+  Future<void> downloadSongFromStream(
+    Stream<List<int>> stream,
+    String title,
+    String artist, {
+    String ext = 'm4a',
+    String? id,
+  }) async {
+    if (id != null) {
+      _downloadingIds.add(id);
+      notifyListeners();
+    }
+    try {
+      // Get directory
+      Directory? dir;
+      if (Platform.isAndroid) {
+        // Request permissions
+        if (await Permission.manageExternalStorage.request().isGranted) {
+          // Android 11+ with All Files Access
+        } else if (await Permission.storage.request().isGranted) {
+          // Older Android or partial access
+        } else {
+          // Permission denied
+          // Try to request manageExternalStorage again if it's permanently denied or restricted
+          if (await Permission.manageExternalStorage.isPermanentlyDenied) {
+            openAppSettings();
+            return;
+          }
+        }
+
+        dir = Directory('/storage/emulated/0/Music/Zofio');
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      final filename =
+          "${title.replaceAll(RegExp(r'[^\w\s]+'), '')} - $artist.$ext";
+      final savePath = p.join(dir.path, filename);
+      final file = File(savePath);
+
+      // Write stream to file
+      final sink = file.openWrite();
+      await stream.pipe(sink);
+      await sink.close();
+
+      // Verify download
+      if (await file.length() == 0) {
+        debugPrint("Download failed: File is empty");
+        await file.delete();
+      } else {
+        debugPrint("Downloaded to $savePath (${await file.length()} bytes)");
+        // Refresh library
+        await fetchSongs();
+      }
+    } catch (e) {
+      debugPrint("Error downloading: $e");
+    } finally {
+      if (id != null) {
+        _downloadingIds.remove(id);
+        notifyListeners();
+      }
+    }
+  }
+
+  // Deprecated: Use downloadSongFromStream for better reliability with YouTube
+  Future<void> downloadSong(
+    String url,
+    String title,
+    String artist, {
+    String ext = 'm4a',
+  }) async {
+    try {
+      // Get directory
+      Directory? dir;
+      if (Platform.isAndroid) {
+        dir = Directory('/storage/emulated/0/Music/Zofio');
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      final filename =
+          "${title.replaceAll(RegExp(r'[^\w\s]+'), '')} - $artist.$ext";
+      final savePath = p.join(dir.path, filename);
+
+      // Download using HttpClient
+      final request = await HttpClient().getUrl(Uri.parse(url));
+      final response = await request.close();
+      final file = File(savePath);
+      await response.pipe(file.openWrite());
+
+      debugPrint("Downloaded to $savePath");
+
+      if (await file.length() == 0) {
+        await file.delete();
+      } else {
+        await fetchSongs();
+      }
+    } catch (e) {
+      debugPrint("Error downloading: $e");
     }
   }
 }
