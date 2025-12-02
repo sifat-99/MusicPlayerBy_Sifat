@@ -47,22 +47,17 @@ jobs:
             ## 🚀 What's New in v${{ github.run_number }}
 
             ### ✨ New Features
-            *   **Dynamic Theme Engine**: Customize the app's look with a color picker.
-            *   **Glassmorphism UI**: Modern, frosted-glass effect on navigation bars, search bars, and mini-player.
-            *   **Waveform Progress Bar**: Visualizing playback progress with a dynamic waveform.
-            *   **Glowing Artwork**: Pulsating glow animation on the player screen.
-            *   **Quick Picks Source Indicators**: Icons to distinguish Online (Cloud) vs. Local (SD Card) songs.
-            *   **User Accounts**: Google Sign-In integration with profile avatar and logout functionality.
-            *   **Local Songs Tab**: Enhanced with Search, A-Z Sidebar, and Scrollbar.
-            *   **Muxed Stream Support**: Reliable YouTube playback and downloads using video+audio streams.
-            *   **Swipe-to-Close Mini Player**: Improved gesture control.
+            *   **App Mode Selection**: Choose between "Online & Offline" or "Only Offline" mode at startup.
+            *   **Offline Mode**: Dedicated offline experience with restricted online features and no login requirement.
+            *   **Strict Login Enforcement**: Online playback and downloads now strictly require user authentication.
+            *   **Forced Update Mechanism**: App checks for critical updates and prompts the user to update.
+            *   **Offline Home Banner**: Visual indicator when running in offline mode.
+            *   **Smart State Management**: Auto-switch to Online mode on login, and Offline mode on logout.
 
             ### 🐛 Fixes & Improvements
-            *   Fixed `SocketTimeoutException` and `403 Forbidden` errors for online playback.
-            *   Fixed Android 11+ download permissions and file visibility.
-            *   Resolved UI overlaps (Notification bar, Sidebar, Player screen).
-            *   Improved app responsiveness and instant playback feedback.
-            *   Fixed online-to-local playback switching issues.
+            *   Refactored `UpdateService` for better maintainability.
+            *   Improved startup routing logic.
+            *   Fixed login/logout state synchronization.
 
             *Automated release from commit ${{ github.sha }}*
           files: |
