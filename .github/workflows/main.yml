@@ -35,16 +35,33 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
+      - name: Create key.properties
+        run: |
+          echo "storePassword=${{ secrets.STORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=upload-keystore.jks" >> android/key.properties
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+
       - name: Build APK
         run: flutter build apk --release
+
+      - name: Get App Version
+        id: get_version
+        run: |
+          version=$(grep 'version:' pubspec.yaml | sed 's/version: //')
+          echo "VERSION=$version" >> $GITHUB_ENV
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
+          tag_name: v${{ env.VERSION }}
+          name: ZOFIO v${{ env.VERSION }}
           body: |
-            ## 🚀 What's New in v${{ github.run_number }}
+            ## 🚀 What's New in ZOFIO v${{ env.VERSION }}
 
             ### ✨ New Features
             *   **App Mode Selection**: Choose between "Online & Offline" or "Only Offline" mode at startup.
