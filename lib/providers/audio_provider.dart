@@ -12,11 +12,14 @@ import 'package:sifat_audio/providers/settings_provider.dart';
 import 'package:sifat_audio/services/youtube_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:sifat_audio/providers/auth_provider.dart';
+
 class AudioProvider extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final YouTubeService _youtubeService = YouTubeService();
   late SettingsProvider _settingsProvider;
+  late AuthProvider _authProvider;
   ConcatenatingAudioSource? _playlist;
 
   // Audio Effects
@@ -77,8 +80,9 @@ class AudioProvider extends ChangeNotifier {
     _loadFavorites();
   }
 
-  void updateSettings(SettingsProvider settings) {
+  void update(SettingsProvider settings, AuthProvider auth) {
     _settingsProvider = settings;
+    _authProvider = auth;
 
     // Check if ignored paths changed
     bool ignoredPathsChanged = false;
@@ -111,7 +115,7 @@ class AudioProvider extends ChangeNotifier {
       _cachedMusicPaths = List.from(settings.musicPaths);
       // Re-fetch songs to apply new ignore rules or scan new paths
       // Use microtask to avoid setState during build if this is called during build
-      Future.microtask(() => fetchSongs());
+      fetchSongs();
     } else if (_songs.isNotEmpty) {
       // Re-filter songs if minDuration changed (or other filterable settings)
       filterSongs(""); // Re-apply filter
@@ -391,6 +395,15 @@ class AudioProvider extends ChangeNotifier {
     String artist,
     String artworkUrl,
   ) async {
+    // STRICT LOGIN ENFORCEMENT
+    if (!_authProvider.isLoggedIn) {
+      debugPrint("Access Denied: User must be logged in to play online music.");
+      // Ideally, we should show a UI message, but since this is a provider,
+      // we rely on the caller to handle the UI or listen to an error stream.
+      // For now, returning early prevents playback.
+      return;
+    }
+
     try {
       // Extract Video ID if a full URL is passed
       String videoId = url;
@@ -646,6 +659,12 @@ class AudioProvider extends ChangeNotifier {
     String ext = 'm4a',
     String? id,
   }) async {
+    // STRICT LOGIN ENFORCEMENT
+    if (!_authProvider.isLoggedIn) {
+      debugPrint("Access Denied: User must be logged in to download music.");
+      return;
+    }
+
     if (id != null) {
       _downloadingIds.add(id);
       notifyListeners();
