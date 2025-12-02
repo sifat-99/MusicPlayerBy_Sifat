@@ -6,6 +6,7 @@ import 'package:sifat_audio/screens/settings_screen.dart';
 import 'package:sifat_audio/screens/favorites_screen.dart';
 import 'package:sifat_audio/providers/auth_provider.dart';
 import 'package:sifat_audio/screens/login_screen.dart';
+import 'package:sifat_audio/providers/settings_provider.dart';
 
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key});
@@ -98,6 +99,11 @@ class Sidebar extends StatelessWidget {
                               onPressed: () async {
                                 await auth.signOut();
                                 if (context.mounted) {
+                                  // Set to Offline Mode on logout
+                                  Provider.of<SettingsProvider>(
+                                    context,
+                                    listen: false,
+                                  ).setOfflineMode(true);
                                   Navigator.pop(context); // Close drawer
                                 }
                               },
@@ -193,7 +199,6 @@ class Sidebar extends StatelessWidget {
                               Colors.tealAccent,
                               Colors.yellowAccent,
                               Colors.grey,
-                              Colors.black,
                             ].map((color) {
                               final isSelected =
                                   themeProvider.primaryColor.value ==

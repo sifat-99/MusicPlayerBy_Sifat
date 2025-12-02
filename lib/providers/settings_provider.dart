@@ -23,6 +23,17 @@ class SettingsProvider extends ChangeNotifier {
     _loadSettings();
   }
 
+  bool? _isOfflineMode;
+
+  bool? get isOfflineMode => _isOfflineMode;
+
+  Future<void> setOfflineMode(bool value) async {
+    _isOfflineMode = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isOfflineMode', value);
+  }
+
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     _showLyrics = prefs.getBool('showLyrics') ?? false;
@@ -32,6 +43,9 @@ class SettingsProvider extends ChangeNotifier {
     _fontSize = prefs.getDouble('fontSize') ?? 1.0;
     _ignoredPaths = prefs.getStringList('ignoredPaths') ?? [];
     _musicPaths = prefs.getStringList('musicPaths') ?? [];
+    if (prefs.containsKey('isOfflineMode')) {
+      _isOfflineMode = prefs.getBool('isOfflineMode');
+    }
     notifyListeners();
   }
 

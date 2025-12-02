@@ -8,6 +8,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:sifat_audio/services/youtube_service.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import 'package:sifat_audio/providers/auth_provider.dart';
+import 'package:sifat_audio/providers/settings_provider.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -37,34 +38,47 @@ class _HomeTabState extends State<HomeTab> {
 
     try {
       final audioProvider = Provider.of<AudioProvider>(context, listen: false);
+      final settingsProvider = Provider.of<SettingsProvider>(
+        context,
+        listen: false,
+      );
+      final isOffline = settingsProvider.isOfflineMode ?? false;
 
-      // Fetch YouTube Content
-      final ytQuickPicks = await _youtubeService.getQuickPicks();
-      final ytTrending = await _youtubeService.getTrendingSongs();
-
-      // Convert YT Videos to SongModels
-      final ytQuickPicksSongs = ytQuickPicks.map(_videoToSongModel).toList();
-      final ytTrendingSongs = ytTrending.map(_videoToSongModel).toList();
+      List<SongModel> mixedQuickPicks = [];
+      List<SongModel> ytTrendingSongs = [];
 
       // Get Local Songs (shuffled for variety)
       final localSongs = List<SongModel>.from(audioProvider.songs)..shuffle();
 
-      // Merge for Quick Picks (Interleave: 1 Local, 1 YT, etc.)
-      List<SongModel> mixedQuickPicks = [];
-      int localIndex = 0;
-      int ytIndex = 0;
+      if (isOffline) {
+        // Offline Mode: Only use local songs
+        mixedQuickPicks = localSongs.take(10).toList();
+      } else {
+        // Online Mode: Fetch YouTube Content
+        final ytQuickPicks = await _youtubeService.getQuickPicks();
+        final ytTrending = await _youtubeService.getTrendingSongs();
 
-      // Take up to 10 items total
-      while (mixedQuickPicks.length < 10) {
-        if (localIndex < localSongs.length) {
-          mixedQuickPicks.add(localSongs[localIndex++]);
-        }
-        if (mixedQuickPicks.length < 10 && ytIndex < ytQuickPicksSongs.length) {
-          mixedQuickPicks.add(ytQuickPicksSongs[ytIndex++]);
-        }
-        if (localIndex >= localSongs.length &&
-            ytIndex >= ytQuickPicksSongs.length) {
-          break;
+        // Convert YT Videos to SongModels
+        final ytQuickPicksSongs = ytQuickPicks.map(_videoToSongModel).toList();
+        ytTrendingSongs = ytTrending.map(_videoToSongModel).toList();
+
+        // Merge for Quick Picks (Interleave: 1 Local, 1 YT, etc.)
+        int localIndex = 0;
+        int ytIndex = 0;
+
+        // Take up to 10 items total
+        while (mixedQuickPicks.length < 10) {
+          if (localIndex < localSongs.length) {
+            mixedQuickPicks.add(localSongs[localIndex++]);
+          }
+          if (mixedQuickPicks.length < 10 &&
+              ytIndex < ytQuickPicksSongs.length) {
+            mixedQuickPicks.add(ytQuickPicksSongs[ytIndex++]);
+          }
+          if (localIndex >= localSongs.length &&
+              ytIndex >= ytQuickPicksSongs.length) {
+            break;
+          }
         }
       }
 
@@ -240,13 +254,91 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                           ),
                           onSubmitted: (value) {
-                            _searchYouTube(value);
+                            final settings = Provider.of<SettingsProvider>(
+                              context,
+                              listen: false,
+                            );
+                            if (settings.isOfflineMode == false) {
+                              _searchYouTube(value);
+                            }
                             audioProvider.filterSongs(value);
                           },
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
+
+                    if (Provider.of<SettingsProvider>(
+                          context,
+                          listen: false,
+                        ).isOfflineMode ==
+                        true) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.grey[900]!, Colors.black],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.cloud_off_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 32,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Offline Mode",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Enjoy your local music library",
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary.withOpacity(0.6),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
 
                     if (_ytResults.isNotEmpty) ...[
                       const Text(
@@ -397,6 +489,27 @@ class _HomeTabState extends State<HomeTab> {
                             onTap: () async {
                               if (song.getMap.containsKey('artwork_url')) {
                                 // It's a YouTube stream
+                                final authProvider = Provider.of<AuthProvider>(
+                                  context,
+                                  listen: false,
+                                );
+                                if (!authProvider.isLoggedIn) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                        "Please login to play online music",
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      backgroundColor: Colors.redAccent,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
                                 await audioProvider.playUrl(
                                   song.data, // URL is stored in data
                                   song.title,
@@ -562,15 +675,17 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                     const SizedBox(height: 24),
                     // Just Updated / Today's Hits Header
-                    Text(
-                      "Today's biggest hits - ${DateTime.now().day}  🔥",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    if (justUpdated.isNotEmpty) ...[
+                      Text(
+                        "Today's biggest hits - ${DateTime.now().day}  🔥",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 8),
+                    ],
                   ],
                 ),
               ),
@@ -585,6 +700,27 @@ class _HomeTabState extends State<HomeTab> {
                   onTap: () async {
                     if (song.getMap.containsKey('artwork_url')) {
                       // It's a YouTube stream
+                      final authProvider = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
+                      if (!authProvider.isLoggedIn) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              "Please login to play online music",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            backgroundColor: Colors.redAccent,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
                       await audioProvider.playUrl(
                         song.data, // URL is stored in data
                         song.title,
